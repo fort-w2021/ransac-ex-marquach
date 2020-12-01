@@ -1,0 +1,52 @@
+## (Ran-)Sackgang
+
+Wir implementieren die [RANSAC-Methode](https://en.wikipedia.org/wiki/Random_sample_consensus) für lineare Modelle in einer Funktion `ransaclm` mit (mindestens) Argumenten `formula` (wie in `lm`), `data` (wie in `lm`), `error_threshold` (=$t$ im verlinkten Wikipedia-Artikel), `inlier_threshold` (=$d$ im verlinkten) und `iterations`.  
+Was für zusätzliche Argumente benötigt die Funktion? (bitte erst selbst überlegen, dann Codebeispiel weiter unten anschauen...)  
+
+Die Funktion soll eine Liste mit Einträgen `model` und `data` zurückliefern:
+
+- `model`: das gefundene beste Modell (ein `lm`-Objekt). `NULL` falls kein Modell gefunden wurde was den gegebenen thresholds entspricht.
+- `data`: die für die Suche nach `model` verwendeten Daten, im Erfolgsfall ergänzt um eine `logical`-Spalte `.consensus_set` die das gefundene beste `consensus set` für `model` definiert.
+
+--------------
+
+a) *First, understand the problem. Then, write the code.* Skizzieren Sie zunächst in Pseudo-Code wie der RANSAC Algorithmus in Einzelschritte und Sub-Funktionen zergliedert werden kann. Definieren Sie sauber was jeweils die Inputs und Outputs dieser Sub-Funktionen sein sollen. Gehen Sie hier iterativ vor -- verfeinern Sie sukzessive die grobe, abstrakte Untergliederung in immer kleinere, konkretere Teilschritte. 
+
+- Denken Sie defensiv: Was könnte schiefgehen, wie gehen Sie sinnvoll damit um? Stichworte: Untaugliche Argumente, Daten mit fehlenden Werten, Faktorvariablen, lineare Modelle mit "$p > n$", etc....
+- Denken Sie parallel: Wie können Sie diesen Algorithmus am besten (plattformunabhängig) parallelisieren? 
+(Welches Paket -- `{future.apply}`, `{furrr}` `{foreach}` + `{do??}`, `{parallel}` -- Sie für die Parallelisierung benutzen bleibt Ihnen überlassen.)
+
+b) Implementieren Sie Ihren Entwurf aus a).
+
+c) Überprüfen Sie Ihre Implementation (auch) mit dem untenstehenden Testcode auf Korrektheit, Ihre Funktion sollte (ungefähr, da stochastischer Algorithmus!) das selbe Ergebnis produzieren.  
+Überlegen Sie sich weitere Testfälle für Komplikationen, die bei der Anwendung auf echte Daten auftauchen könnten, und überprüfen Sie Ihre Funktion damit. Schreiben Sie dafür entsprechende Tests mit den in `testthat` und `checkmate` implementierten `expect_<BLA>()`-Funktionen.
+
+**Wie immer gilt: Schreiben Sie sauber strukturierten, ausführlich kommentierten & funktionalen 
+Code ("KIS! DRY!"), der für erwartbare Fehler und ungeeignete Inputs informative Fehlermeldungen und Warnungen produziert.**
+
+-----
+
+```{r, echo = FALSE, code = readLines("topdown-ransac-def.R")}
+```
+
+#### Tooling / Testing / Diagnostics:
+
+Wir schreiben also zusätzlich 
+
+- eine Funktion die Daten aus einem linearen Modell mit klaren Outliern 
+generiert um Testdatensätze zur Überprüfung unserer Funktion zu erzeugen, sowie
+- eine Funktion die die `ransaclm`-Ergebnisse zusammenfasst und für univariate Modelle das
+Ergebnis visualisiert.
+
+Das könnte etwa so aussehen:
+```{r, ransac_test_utils, code = readLines("topdown-ransac-utils.R")}
+```
+Natürlich können Sie das obenstehende an Ihre Implementation anpassen oder sich auch ähnliche Funktionen selbst basteln.
+
+Ihre Implementation sollte dann -- in etwa -- folgendes Verhalten reproduzieren:
+```{r, ransac_example, code = readLines("topdown-ransac-example.R")}
+```
+
+Hinweis 1: Durch die Formelnotation mit "`- inlier`" bleibt -- in meiner Implementation, zumindest -- die ursprünglich angelegte `inlier`-Variable, welche die wahren *inlier* identifiziert, im Datensatz des Rückgabeobjekts erhalten so dass wir mit `validate_ransac` eine Kreuztabelle der wahren und entdeckten Inlier/Outlier erzeugen können.
+
+Hinweis 2: Es ist zu erwarten dass Parallelisierung hier -- wenn überhaupt -- nur bei recht großen Datensätzen Zeitvorteile bringt, in meiner Testimplementation sehe ich zB bei `n_obs = 100000, n_coef = 10` und 20 (!) parallelen Prozessen nur etwa eine Halbierung der Rechenzeit gegenüber einer sequentiellen Berechnung...
