@@ -10,45 +10,58 @@ ransaclm <- function(formula, data, error_threshold, inlier_threshold, iteration
   # Interartion auch count data
   # seed auch count
   sample_size <- ncol(data)
-  rows <- seq_len(nrow(data))
+  nrows <- seq_len(nrow(data))
   
-  results <-  rep(list(list(model = NULL, data = NULL)), iterations)
-  
-  hypothetical_inliers <- get_hypothetical_inliers(sample_size, rows, data) # sample from each column one value
+  results <-  rep(list(list(model = NA, data = NA)), iterations)
+  for(rep in seq_len(iterations)){
+  hypothetical_inliers <- get_hypothetical_inliers(sample_size, data) # sample from each column one value
   maybe_model <- get_maybe_model(formula, hypothetical_inliers) 
+  results[[rep]]["model"] <- maybe_model
   consensus_set <- is_covered(maybe_model, data, error_threshold)
   good_fit <- check_consensus_set(consensus_set, inlier_threshold)
+  if(good_fit = TRUE) {
+  consensus_set_size <- nrow(consensus_set)
+  } else next
   
-  best_fit <- get_best_fit(good_fit)
+  
+  best_fit <- get_best_fit(consensus_set_size)
   
   return(results)
 }
 
-# Zwei Parameter Zwei Gleichungen
+test <- data.frame(x = rnorm(10) + 5, y = rnorm(10,5))
+
+# n Parameter (Spalten) => n Gleichungen (Zeilen)
 get_hypothetical_inliers <- function(sample_size, data){
-  
-  hypothetical_inliers <- matrix(data = NA, nrow = sample_size, ncol = sample_size)
-  colnames(hypothetical_inliers) <- colnames(data)
-  rows <- seq_len(nrow(data))
-  
-  for(s in seq_len(sample_size)){
-    hypothetical_inliers[,s  ] <- data[sample(rows, size = sample_size), s]   
-    # Warum funktioniert hier drop = FALSE nicht? (Fehler: falsche Anzahl von Indizes für Matrix). In test[1:2, 1, drop = FALSE] funktioniert es ganz normal
-  }
-  
-  hypothetical_inliers
+  nrows <- seq_len(nrow(data))
+  rows <- sample(nrows, replace = FALSE, size = sample_size)
+  data[rows, ,drop = FALSE]
 }
 
-get_hypothetical_inliers(sample_size = 2, data = test)
-test
-get_maybe_model(formula, hypothetical_inliers) 
+test_hypo <- get_hypothetical_inliers(sample_size = 2, data = test)
+
 get_maybe_model <- function(formula, hypothetical_inliers){
-  coefs <- coef(lm(formula = formula, data = hypothetical_inliers))
+  lm(formula = formula, data = hypothetical_inliers)
 }
-get_maybe_model(formula = y~x, hypothetical_inliers = as.data.frame(test_hypo))
 
-hypothetical_inliers <- matrix(data = NA, nrow = 2, ncol = 2)
-for(s in seq_len(ncol(test))){
-  hypothetical_inliers[,s  ] <- test[sample(1:5, size = 2), s, drop = FALSE]
+maybe_model <- get_maybe_model(formula = y~x, hypothetical_inliers = test_hypo)
+
+is_covered <- function(maybe_model, data, error_threshold){
+  upr <- (coef(maybe_model)[1] + error_threshold) + coef(maybe_model)[2] * data[, "x" , drop = FALSE]
+  lwr <- (coef(maybe_model)[1] - error_threshold) + coef(maybe_model)[2] * data[, "x" , drop = FALSE]
+  covered <- which(lwr <= data[, "y", drop = FALSE] & data[, "y", drop = FALSE] <= upr)
+  data[covered, , drop = FALSE]
 }
-test[sample(1:5,2), 2, drop = FALSE]
+
+
+
+consensus_set <- is_covered(maybe_model, test, error_threshold = 1)
+
+
+check_consensus_set <- function(consensus_set, inlier_threshold){
+  nrow(consensus_set) >= inlier_threshold
+}
+
+check_consensus_set(consensus_set = consensus_set, inlier_threshold = 5)
+
+c(test[[2]], best_fit = TRUE)
