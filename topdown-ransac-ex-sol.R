@@ -23,22 +23,25 @@ ransaclm <- function(formula, data, error_threshold, inlier_threshold, iteration
     good_fit <- check_consensus_set(consensus_set, inlier_threshold)
     
     if (good_fit == TRUE) {
-      consensus_set_size <- nrow(consensus_set)
+      consensus_set_size <- sum(consensus_set == 1)
     } else {
       consensus_set_size <- NA
     }
     results[[paste("rep", rep , sep = "_")]] <- list(matrix = hypothetical_inliers,
                                                      model = maybe_model, 
                                                      good_fit = good_fit, 
+                                                     .consensus_set = consensus_set,
                                                      set_size = consensus_set_size)
   }
   
   consensus_set_size_vector <- unlist(lapply(results, `[`, "set_size"))
-  best_fit <- which.max(consensus_set_size_vector)  
-  final_model <- lm(y~ . - inlier, data = subset(data, consensus_set))
+  best <- which.max(consensus_set_size_vector)
+  best_fit <- results[[best]]
   consensus_set <- best_fit[[".consensus_set", drop = FALSE]]
+  final_model <- lm(y~ . - inlier, data = subset(data, consensus_set))
+  final_consensus_set <- is_covered(final_model, data, error_threshold)
   final_results <- list( model = final_model,
-                         data = cbind( data, .consensus_set = consensus_set ))
+                         data = cbind( data, .consensus_set = final_consensus_set ))
   
   return(final_results)
 }
